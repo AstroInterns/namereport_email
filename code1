@@ -1,0 +1,145 @@
+import jinja2
+
+template = jinja2.Environment(
+    loader = jinja2.FileSystemLoader("Template")
+    
+).get_template("NameBirth.txt")
+
+-----------------------------------------------------------------------------------------------------------------------
+
+context = { "name" : "Virendra", "age" : "32", "city" : "Lucnknow"}
+reportText = template.render(context)
+
+-----------------------------------------------------------------------------------------------------------------------
+
+with open(f"./bio.txt", mode='w') as f:
+    f.write(reportText)
+
+-----------------------------------------------------------------------------------------------------------------------
+
+from fpdf import FPDF
+pdf = FPDF()
+pdf.add_page()
+
+pdf.set_font("Arial", size = 15)
+f = open("bio.txt", "r")
+for x in f:
+    pdf.cell(200, 10, txt = x, ln = True, align = 'C')
+  
+pdf.output("mygfg.pdf")   
+
+----------------------------------------------------------------------------------------------------------------------
+
+import openpyxl
+import random
+
+def read_data_from_sheet(religion, gender, number):
+    wb = openpyxl.load_workbook('NameNum1232.xlsx', read_only=True)  # Load workbook in read-only mode
+    sheet = wb['religion-wise-names (1)']
+    matching_names = []
+
+    for row in sheet.iter_rows(min_row=2, max_col=4):  # Only iterate over first 4 columns
+        name, row_gender, row_religion, row_number = (cell.value for cell in row)
+
+        if row_religion == religion and row_gender == gender and row_number == number:
+            matching_names.append(name)
+
+    return matching_names
+
+def select_random_names(names):
+    selected_names = random.sample(names, min(len(names), 4))
+    return selected_names
+
+def create():
+    user_religion = 'Hinduism'
+    user_gender = 'Female'
+    user_number = 6
+    matching_names = read_data_from_sheet(user_religion, user_gender, user_number)
+    selected_names = select_random_names(matching_names)
+    print('Matching Names:', selected_names)
+
+create()
+
+-------------------------------------------------------------------------------------------------------------------------------------------
+
+import redis
+import json
+import base64
+
+# Connect to Redis
+r = redis.Redis(host='localhost', port=6379, db=0)
+
+# Read the PDF file
+pdf_file_path = 'mygfg.pdf'  # Update with the path to your PDF file
+with open(pdf_file_path, 'rb') as file:
+    pdf_content = file.read()
+
+# Encode the PDF content to base64
+encoded_pdf_content = base64.b64encode(pdf_content).decode('utf-8')
+
+# Example email message with PDF attachment
+email_message = {
+    'to': 'tech@astroarunpandit.org',
+    'subject': 'Test Email with PDF Attachment',
+    'body': 'This is a test email from Redis with a PDF attachment.',
+    'attachment': encoded_pdf_content
+}
+
+# Enqueue email message to Redis
+r.rpush('email_queue', json.dumps(email_message))
+
+
+-------------------------------------------------------------------------------------------------------------------------------
+
+import redis
+import json
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
+
+# Connect to Redis
+r = redis.Redis(host='localhost', port=6379, db=0)
+
+# Connect to SMTP server
+smtp_server = 'smtp.gmail.com'
+smtp_port = 587
+sender_email = 'astro.interns@gmail.com'
+sender_password = 'ycxs bqqi mrfy ixxg'
+server = smtplib.SMTP(smtp_server, smtp_port)
+server.starttls()
+server.login(sender_email, sender_password)
+
+# Dequeue and send email messages from Redis
+while True:
+    email_message_str = r.lpop('email_queue')
+    if email_message_str:
+        email_message = json.loads(email_message_str)
+        msg = MIMEMultipart()
+        msg['Subject'] = email_message['subject']
+        msg['From'] = sender_email
+        msg['To'] = email_message['to']
+        
+        # Add text body
+        msg.attach(MIMEText(email_message['body'], 'plain'))
+        
+        # Add PDF attachment
+        pdf_filename = "mygfg.pdf"  # Update with the path to your PDF file
+        with open(pdf_filename, 'rb') as attachment:
+            part = MIMEBase('application', 'octet-stream')
+            part.set_payload(attachment.read())
+        encoders.encode_base64(part)
+        part.add_header('Content-Disposition', f'attachment; filename= {pdf_filename}')
+        msg.attach(part)
+        
+        # Send email
+        server.sendmail(sender_email, [email_message['to']], msg.as_string())
+        print('Email sent:', email_message)
+    else:
+        break
+
+# Close SMTP connection
+server.quit()
+
+--------------------------------------------------------------------------------------------------------------------------------
